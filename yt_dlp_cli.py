@@ -83,6 +83,7 @@ async def get_audio_id(user_quality: str, format_info: list, video_format: str) 
 async def build_yt_dlp_command(options: str, output_path: str, url: str) -> str:
     return f"yt-dlp --no-warnings {options} -o {output_path} {url}"
 
+
 async def generate_dl_command(
     url: str,
     user_id: int,
@@ -122,10 +123,9 @@ async def exec_command(commands: list, message, dl_message):
         _, stderr = await proc.communicate()
 
         if proc.returncode != 0:
-            error_message += f"```{stderr.decode()}```"
-
+            error_message = f"```{stderr.decode()}```"
             await dl_message.edit_text(
-                error_message, parse_mode=enums.ParseMode.MARKDOWN
+                error_message, parse_mode=enums.ParseMode.MARKDOWN 
             )
             return
 
@@ -137,7 +137,7 @@ async def exec_command(commands: list, message, dl_message):
 
 
 async def Youtube_CLI(message: Message):
-	url = message.text
+    url = message.text
     user_id = message.from_user.id
     username = message.from_user.username
     user_quality = await get_user_quality(user_id)
@@ -192,4 +192,3 @@ async def Youtube_CLI(message: Message):
                 await dl_message.edit_text(
                     f"<code>{ex}</code>", parse_mode=enums.ParseMode.HTML
                 )
-                
