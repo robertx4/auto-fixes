@@ -3,12 +3,14 @@ import shlex
 
 from bot.database import MongoDB
 from pyrogram import enums
-from pyrogram.types import Message
 
 
 async def get_user_quality(user_id: int) -> str:
-    user_data = MongoDB().find_one(user_id)
-    return user_data["yt_qual"]
+    try:
+        user_data = MongoDB().find_one(user_id)
+        return user_data["yt_qual"]
+    except Exception as ex:
+        return "720p"
 
 
 async def fetch_format_info(url: str) -> list:
@@ -24,34 +26,24 @@ async def fetch_format_info(url: str) -> list:
 
 
 async def get_best_format(user_quality: str, format_info: list) -> str:
-    best_format = None
-
     for line in format_info:
-        if ("av01" in line or "vp9" in line) and user_quality in line:
-            best_format = line.split()[0]
-            break
+        if ("av01" in line or "vp09" in line) and user_quality in line:
+            return line.split()[0]
 
-    if not best_format:
+    if all(user_quality not in line for line in format_info):
         for line in format_info:
             if "av01" in line:
-                best_format = "bv[vcodec^=av01]"
-                break
+                return "bv[vcodec^=av01]"
 
-        if not best_format:
-            for line in format_info:
-                if "vp9" in line:
-                    best_format = "bv[vcodec=vp9]"
-                    break
+        for line in format_info:
+            if "vp09" in line:
+                return "bv[vcodec^=vp09]"
 
-    if not best_format:
-        best_format = "605"
-
-    return best_format
+    return "bv[vcodec^=vp09]"
 
 
 async def get_audio_id(user_quality: str, format_info: list, video_format: str) -> str:
     spanish_audio_found = False
-
     for line in format_info:
         if "opus" in line and "[es" in line:
             audio_id = "ba[language^=es]"
@@ -68,47 +60,43 @@ async def get_audio_id(user_quality: str, format_info: list, video_format: str) 
         "1080p": "251",
     }
     for line in format_info:
-        if ("av01" in line or "vp9" in line) and user_quality in line:
+        if ("av01" in line or "vp09" in line) and user_quality in line:
             audio_id = audio_map.get(user_quality, audio_id)
             break
 
-    for line in format_info:
-        for tag in ("[es", "-"):
+    for tag in ("[es", "-"):
+        for line in format_info:
             if audio_id in line and tag in line:
                 return line.split()[0]
 
     return audio_id
 
 
-async def build_yt_dlp_command(options: str, output_path: str, url: str) -> str:
-    return f"yt-dlp --no-warnings {options} -o {output_path} {url}"
-
-
 async def generate_dl_command(
     url: str,
     user_id: int,
     username: str,
+    user_quality: str,
     format_info: list,
     video_format: str,
     audio_format: str,
-) -> list:
-    common_options = "--sub-langs es.* --embed-subs --embed-thumbnail --embed-metadata --parse-metadata description:(?s)(?P<meta_comment>.+) --convert-subs ass --convert-thumbnails jpg"
+) -> str:
+    command1 = f"yt-dlp --no-warnings -f {video_format}+{audio_format}"
 
-    if audio_format in format_info and not any("[es" in line for line in format_info):
-        common_options += " --write-auto-subs"
-    elif audio_format == "bestaudio":
-        common_options += " --write-auto-subs"
+    for line in format_info:
+        if (audio_format in line and "[es" not in line) or audio_format == "bestaudio":
+            command1 += " --write-auto-subs"
+            break
 
-    command1 = build_yt_dlp_command(
-        f"{video_format}+{audio_format} {common_options}",
-        f"Root/{username}/%(title)s.%(ext)s",
-        url,
+    command1 += (
+        " --sub-langs es.* --embed-subs --embed-thumbnail --embed-metadata"
+        " --parse-metadata description:(?s)(?P<meta_comment>.+) --convert-subs ass"
+        f" --convert-thumbnails jpg -o Root/{username}/%(title)s.%(ext)s {url}"
     )
 
-    command2 = build_yt_dlp_command(
-        f"--write-thumbnail --skip-download --convert-thumbnails jpg",
-        f"Root/thumbs/{user_id}/%(title)s.%(ext)s",
-        url,
+    command2 = (
+        "yt-dlp --write-thumbnail --no-warnings --skip-download --convert-thumbnails"
+        f" jpg -o Root/thumbs/{user_id}/%(title)s.%(ext)s {url}"
     )
 
     return [command1, command2]
@@ -120,12 +108,11 @@ async def exec_command(commands: list, message, dl_message):
         proc = await asyncio.create_subprocess_exec(
             *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
-        _, stderr = await proc.communicate()
+        stdout, stderr = await proc.communicate()
 
         if proc.returncode != 0:
-            error_message = f"```{stderr.decode()}```"
             await dl_message.edit_text(
-                error_message, parse_mode=enums.ParseMode.MARKDOWN
+                f"```{stderr.decode()}```", parse_mode=enums.ParseMode.MARKDOWN
             )
             return
 
@@ -136,8 +123,7 @@ async def exec_command(commands: list, message, dl_message):
     )
 
 
-async def Youtube_CLI(message: Message):
-    url = message.text
+async def Youtube_CLI(message, url: str):
     user_id = message.from_user.id
     username = message.from_user.username
     user_quality = await get_user_quality(user_id)
@@ -164,7 +150,7 @@ async def Youtube_CLI(message: Message):
 
             await dl_message.edit_text(f"⬇️ <b>Downloading In {user_quality}...</b>")
 
-            if video_format in ["bv[vcodec^=av01]", "bv[vcodec=vp9]"]:
+            if video_format in ["bv[vcodec^=av01]", "bv[vcodec^=vp09]"]:
                 await dl_message.edit_text("⚠️ <b>Selected Quality Not Available.</b>")
                 await asyncio.sleep(3)
                 await dl_message.edit_text("⬇️ <b>Trying Best Available...</b>")
