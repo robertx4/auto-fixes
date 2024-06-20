@@ -164,7 +164,7 @@ async def Youtube_CLI(message: Message):
 
             await dl_message.edit_text(f"⬇️ <b>Downloading In {user_quality}...</b>")
 
-            if video_format in ["bv[vcodec^=av01]", "bv[vcodec^=vp09]"]:
+            if video_format in ["bv[vcodec^=av01]", "bv[vcodec=vp9]"]:
                 await dl_message.edit_text("⚠️ <b>Selected Quality Not Available.</b>")
                 await asyncio.sleep(3)
                 await dl_message.edit_text("⬇️ <b>Trying Best Available...</b>")
