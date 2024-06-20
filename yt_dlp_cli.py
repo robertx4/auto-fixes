@@ -80,10 +80,42 @@ async def get_audio_id(user_quality: str, format_info: list, video_format: str) 
     return audio_id
 
 
+async def build_yt_dlp_command(options: str, output_path: str, url: str) -> str:
+    return f"yt-dlp --no-warnings {options} -o {output_path} {url}"
 
+
+async def generate_dl_command(
+    url: str,
+    user_id: int,
+    username: str,
+    format_info: list,
+    video_format: str,
+    audio_format: str,
+) -> list:
+    common_options = "--sub-langs es.* --embed-subs --embed-thumbnail --embed-metadata --parse-metadata description:(?s)(?P<meta_comment>.+) --convert-subs ass --convert-thumbnails jpg"
+
+    if audio_format in format_info and not any("[es" in line for line in format_info):
+        common_options += " --write-auto-subs"
+    elif audio_format == "bestaudio":
+        common_options += " --write-auto-subs"
+
+    command1 = build_yt_dlp_command(
+        f"{video_format}+{audio_format} {common_options}",
+        f"Root/{username}/%(title)s.%(ext)s",
+        url
+    )
+    
+    command2 = build_yt_dlp_command(
+        f"--write-thumbnail --skip-download --convert-thumbnails jpg",
+        f"Root/thumbs/{user_id}/%(title)s.%(ext)s",
+        url
+    )
+
+    return [command1, command2]
 
 
 async def exec_command(commands: list, message, dl_message):
+    error_message = "❌ <b>Download Failed!</b>\n\n"
     for command in commands:
         args = shlex.split(command)
         proc = await asyncio.create_subprocess_exec(
@@ -92,8 +124,7 @@ async def exec_command(commands: list, message, dl_message):
         _, stderr = await proc.communicate()
 
         if proc.returncode != 0:
-            error_message += f"```{stderr.decode()}```"
-
+            error_message = f"```{stderr.decode()}```"
             await dl_message.edit_text(
                 error_message, parse_mode=enums.ParseMode.MARKDOWN
             )
@@ -107,7 +138,7 @@ async def exec_command(commands: list, message, dl_message):
 
 
 async def Youtube_CLI(message: Message):
-	url = message.text
+    url = message.text
     user_id = message.from_user.id
     username = message.from_user.username
     user_quality = await get_user_quality(user_id)
@@ -143,7 +174,6 @@ async def Youtube_CLI(message: Message):
                 url,
                 user_id,
                 username,
-                user_quality,
                 format_info,
                 video_format,
                 audio_format,
@@ -162,3 +192,4 @@ async def Youtube_CLI(message: Message):
                 await dl_message.edit_text(
                     f"<code>{ex}</code>", parse_mode=enums.ParseMode.HTML
                 )
+                
