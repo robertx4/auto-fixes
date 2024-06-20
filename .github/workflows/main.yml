@@ -22,7 +22,7 @@ jobs:
 
       - name: Format Code
         run: |
-          autopep8 -ir --aggressive --aggressive .
+          # autopep8 -ir --aggressive --aggressive .
           autoflake -ir --remove-all-unused-imports --remove-unused-variables .
           isort .
           black --preview .
