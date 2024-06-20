@@ -102,13 +102,13 @@ async def generate_dl_command(
     command1 = build_yt_dlp_command(
         f"{video_format}+{audio_format} {common_options}",
         f"Root/{username}/%(title)s.%(ext)s",
-        url
+        url,
     )
-    
+
     command2 = build_yt_dlp_command(
         f"--write-thumbnail --skip-download --convert-thumbnails jpg",
         f"Root/thumbs/{user_id}/%(title)s.%(ext)s",
-        url
+        url,
     )
 
     return [command1, command2]
@@ -192,4 +192,3 @@ async def Youtube_CLI(message: Message):
                 await dl_message.edit_text(
                     f"<code>{ex}</code>", parse_mode=enums.ParseMode.HTML
                 )
-                
