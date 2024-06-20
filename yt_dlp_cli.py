@@ -80,34 +80,7 @@ async def get_audio_id(user_quality: str, format_info: list, video_format: str) 
     return audio_id
 
 
-async def generate_dl_command(
-    url: str,
-    user_id: int,
-    username: str,
-    user_quality: str,
-    format_info: list,
-    video_format: str,
-    audio_format: str,
-) -> str:
-    command1 = f"yt-dlp --no-warnings -f {video_format}+{audio_format}"
 
-    for line in format_info:
-        if (audio_format in line and "[es" not in line) or audio_format == "bestaudio":
-            command1 += " --write-auto-subs"
-            break
-
-    command1 += (
-        " --sub-langs es.* --embed-subs --embed-thumbnail --embed-metadata"
-        " --parse-metadata description:(?s)(?P<meta_comment>.+) --convert-subs ass"
-        f" --convert-thumbnails jpg -o Root/{username}/%(title)s.%(ext)s {url}"
-    )
-
-    command2 = (
-        "yt-dlp --write-thumbnail --no-warnings --skip-download --convert-thumbnails"
-        f" jpg -o Root/thumbs/{user_id}/%(title)s.%(ext)s {url}"
-    )
-
-    return [command1, command2]
 
 
 async def exec_command(commands: list, message, dl_message):
