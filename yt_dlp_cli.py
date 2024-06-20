@@ -3,14 +3,12 @@ import shlex
 
 from bot.database import MongoDB
 from pyrogram import enums
+from pyrogram.types import Message
 
 
 async def get_user_quality(user_id: int) -> str:
-    try:
-        user_data = MongoDB().find_one(user_id)
-        return user_data["yt_qual"]
-    except Exception as ex:
-        return "720p"
+    user_data = MongoDB().find_one(user_id)
+    return user_data["yt_qual"]
 
 
 async def fetch_format_info(url: str) -> list:
@@ -26,24 +24,34 @@ async def fetch_format_info(url: str) -> list:
 
 
 async def get_best_format(user_quality: str, format_info: list) -> str:
-    for line in format_info:
-        if ("av01" in line or "vp09" in line) and user_quality in line:
-            return line.split()[0]
+    best_format = None
 
-    if all(user_quality not in line for line in format_info):
+    for line in format_info:
+        if ("av01" in line or "vp9" in line) and user_quality in line:
+            best_format = line.split()[0]
+            break
+
+    if not best_format:
         for line in format_info:
             if "av01" in line:
-                return "bv[vcodec^=av01]"
+                best_format = "bv[vcodec^=av01]"
+                break
 
-        for line in format_info:
-            if "vp09" in line:
-                return "bv[vcodec^=vp09]"
+        if not best_format:
+            for line in format_info:
+                if "vp9" in line:
+                    best_format = "bv[vcodec=vp9]"
+                    break
 
-    return "bv[vcodec^=vp09]"
+    if not best_format:
+        best_format = "605"
+
+    return best_format
 
 
 async def get_audio_id(user_quality: str, format_info: list, video_format: str) -> str:
     spanish_audio_found = False
+
     for line in format_info:
         if "opus" in line and "[es" in line:
             audio_id = "ba[language^=es]"
@@ -60,12 +68,12 @@ async def get_audio_id(user_quality: str, format_info: list, video_format: str) 
         "1080p": "251",
     }
     for line in format_info:
-        if ("av01" in line or "vp09" in line) and user_quality in line:
+        if ("av01" in line or "vp9" in line) and user_quality in line:
             audio_id = audio_map.get(user_quality, audio_id)
             break
 
-    for tag in ("[es", "-"):
-        for line in format_info:
+    for line in format_info:
+        for tag in ("[es", "-"):
             if audio_id in line and tag in line:
                 return line.split()[0]
 
@@ -108,11 +116,13 @@ async def exec_command(commands: list, message, dl_message):
         proc = await asyncio.create_subprocess_exec(
             *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await proc.communicate()
+        _, stderr = await proc.communicate()
 
         if proc.returncode != 0:
+            error_message += f"```{stderr.decode()}```"
+
             await dl_message.edit_text(
-                f"```{stderr.decode()}```", parse_mode=enums.ParseMode.MARKDOWN
+                error_message, parse_mode=enums.ParseMode.MARKDOWN
             )
             return
 
@@ -123,7 +133,8 @@ async def exec_command(commands: list, message, dl_message):
     )
 
 
-async def Youtube_CLI(message, url: str):
+async def Youtube_CLI(message: Message):
+	url = message.text
     user_id = message.from_user.id
     username = message.from_user.username
     user_quality = await get_user_quality(user_id)
