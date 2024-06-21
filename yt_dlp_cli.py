@@ -62,6 +62,8 @@ async def get_audio_id(user_quality: str, format_info: list, video_format: str) 
         audio_id = "bestaudio"
 
     audio_map = {
+        "144p": "wa[acodec=opus]",
+        "240p": "wa[acodec=opus]",
         "360p": "wa[acodec=opus]",
         "480p": "249",
         "720p": "250",
@@ -80,10 +82,6 @@ async def get_audio_id(user_quality: str, format_info: list, video_format: str) 
     return audio_id
 
 
-async def build_yt_dlp_command(options: str, output_path: str, url: str) -> str:
-    return f"yt-dlp --no-warnings {options} -o {output_path} {url}"
-
-
 async def generate_dl_command(
     url: str,
     user_id: int,
@@ -92,45 +90,53 @@ async def generate_dl_command(
     video_format: str,
     audio_format: str,
 ) -> list:
-    common_options = "--sub-langs es.* --embed-subs --embed-thumbnail --embed-metadata --parse-metadata description:(?s)(?P<meta_comment>.+) --convert-subs ass --convert-thumbnails jpg"
 
-    if audio_format in format_info and not any("[es" in line for line in format_info):
-        common_options += " --write-auto-subs"
-    elif audio_format == "bestaudio":
-        common_options += " --write-auto-subs"
+    command = ["yt-dlp", "--no-warnings", f"-f {video_format}+{audio_format}"]
 
-    command1 = build_yt_dlp_command(
-        f"{video_format}+{audio_format} {common_options}",
-        f"Root/{username}/%(title)s.%(ext)s",
-        url,
+    if any(audio_format in line and "[es" not in line for line in format_info) or audio_format == "bestaudio":
+        command.extend(["--write-auto-subs", "--sub-langs", "es.*"])
+
+    command.extend(
+        [
+            "--embed-subs",
+            "--embed-thumbnail",
+            "--embed-metadata",
+            "--parse-metadata", 
+            "description:(?s)(?P<meta_comment>.+)",
+            "--convert-subs", "ass",
+            "--convert-thumbnails", "jpg",
+            "-o", f"Root/{username}/%(title)s.%(ext)s",
+            url,
+        ]
     )
+    
+    thumbnail_command = [
+        "yt-dlp", 
+        "--write-thumbnail", 
+        "--no-warnings", 
+        "--skip-download", 
+        "--convert-thumbnails", "jpg",
+        "-o", f"Root/thumbs/{user_id}/%(title)s.%(ext)s", 
+        url
+    ]
 
-    command2 = build_yt_dlp_command(
-        f"--write-thumbnail --skip-download --convert-thumbnails jpg",
-        f"Root/thumbs/{user_id}/%(title)s.%(ext)s",
-        url,
-    )
-
-    return [command1, command2]
+    return [command, thumbnail_command]
 
 
 async def exec_command(commands: list, message, dl_message):
-    error_message = "❌ <b>Download Failed!</b>\n\n"
     for command in commands:
-        args = shlex.split(command)
         proc = await asyncio.create_subprocess_exec(
-            *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            *command, 
+            stdout=asyncio.subprocess.PIPE, 
+            stderr=asyncio.subprocess.PIPE
         )
         _, stderr = await proc.communicate()
 
         if proc.returncode != 0:
-            error_message = f"```{stderr.decode()}```"
             await dl_message.edit_text(
-                error_message, parse_mode=enums.ParseMode.MARKDOWN
+                f"```{stderr.decode()}```", parse_mode=enums.ParseMode.MARKDOWN
             )
             return
-
-        await proc.wait()
 
     await dl_message.edit_text(
         "✅ <b>Video Downloaded Successfully\nUse <i>/ls</i> To View Directory</b>"
@@ -165,10 +171,15 @@ async def Youtube_CLI(message: Message):
 
             await dl_message.edit_text(f"⬇️ <b>Downloading In {user_quality}...</b>")
 
-            if video_format in ["bv[vcodec^=av01]", "bv[vcodec^=vp09]"]:
+            if video_format in ["bv[vcodec^=av01]", "bv[vcodec=vp9]"]:
                 await dl_message.edit_text("⚠️ <b>Selected Quality Not Available.</b>")
                 await asyncio.sleep(3)
                 await dl_message.edit_text("⬇️ <b>Trying Best Available...</b>")
+
+            elif video_format == "605":
+                await dl_message.edit_text("⚠️ <b>Selected Quality Not Available.</b>")
+                await asyncio.sleep(3)
+                await dl_message.edit_text("⬇️ <b>Downloading In 360p...</b>")
 
             final_command = await generate_dl_command(
                 url,
@@ -192,3 +203,4 @@ async def Youtube_CLI(message: Message):
                 await dl_message.edit_text(
                     f"<code>{ex}</code>", parse_mode=enums.ParseMode.HTML
                 )
+                
