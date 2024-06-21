@@ -157,9 +157,7 @@ async def Youtube_CLI(message: Message, msg):
     user_quality = await get_user_quality(user_id)
 
     retries = 3
-    dl_message = await msg.edit_text(
-        "🔎 <b><i>Fetching Video Details...</i></b>"
-    )
+    dl_message = await msg.edit_text("🔎 <b><i>Fetching Video Details...</i></b>")
 
     for attempt in range(retries + 1):
         try:
@@ -210,4 +208,3 @@ async def Youtube_CLI(message: Message, msg):
                 await dl_message.edit_text(
                     f"<code>{ex}</code>", parse_mode=enums.ParseMode.HTML
                 )
-                
