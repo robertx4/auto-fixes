@@ -96,10 +96,11 @@ async def generate_dl_command(
         any(audio_format in line and "[es" not in line for line in format_info)
         or audio_format == "bestaudio"
     ):
-        command.extend(["--write-auto-subs", "--sub-langs", "es.*"])
+        command.append("--write-auto-subs")
 
     command.extend(
         [
+            "--sub-langs", "es.*",
             "--embed-subs",
             "--embed-thumbnail",
             "--embed-metadata",
