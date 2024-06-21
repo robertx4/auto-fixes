@@ -100,7 +100,8 @@ async def generate_dl_command(
 
     command.extend(
         [
-            "--sub-langs", "es.*",
+            "--sub-langs",
+            "es.*",
             "--embed-subs",
             "--embed-thumbnail",
             "--embed-metadata",
