@@ -1,5 +1,4 @@
 import asyncio
-import shlex
 
 from bot.database import MongoDB
 from pyrogram import enums
@@ -93,7 +92,10 @@ async def generate_dl_command(
 
     command = ["yt-dlp", "--no-warnings", f"-f {video_format}+{audio_format}"]
 
-    if any(audio_format in line and "[es" not in line for line in format_info) or audio_format == "bestaudio":
+    if (
+        any(audio_format in line and "[es" not in line for line in format_info)
+        or audio_format == "bestaudio"
+    ):
         command.extend(["--write-auto-subs", "--sub-langs", "es.*"])
 
     command.extend(
@@ -101,23 +103,28 @@ async def generate_dl_command(
             "--embed-subs",
             "--embed-thumbnail",
             "--embed-metadata",
-            "--parse-metadata", 
+            "--parse-metadata",
             "description:(?s)(?P<meta_comment>.+)",
-            "--convert-subs", "ass",
-            "--convert-thumbnails", "jpg",
-            "-o", f"Root/{username}/%(title)s.%(ext)s",
+            "--convert-subs",
+            "ass",
+            "--convert-thumbnails",
+            "jpg",
+            "-o",
+            f"Root/{username}/%(title)s.%(ext)s",
             url,
         ]
     )
-    
+
     thumbnail_command = [
-        "yt-dlp", 
-        "--write-thumbnail", 
-        "--no-warnings", 
-        "--skip-download", 
-        "--convert-thumbnails", "jpg",
-        "-o", f"Root/thumbs/{user_id}/%(title)s.%(ext)s", 
-        url
+        "yt-dlp",
+        "--write-thumbnail",
+        "--no-warnings",
+        "--skip-download",
+        "--convert-thumbnails",
+        "jpg",
+        "-o",
+        f"Root/thumbs/{user_id}/%(title)s.%(ext)s",
+        url,
     ]
 
     return [command, thumbnail_command]
@@ -126,9 +133,7 @@ async def generate_dl_command(
 async def exec_command(commands: list, message, dl_message):
     for command in commands:
         proc = await asyncio.create_subprocess_exec(
-            *command, 
-            stdout=asyncio.subprocess.PIPE, 
-            stderr=asyncio.subprocess.PIPE
+            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         _, stderr = await proc.communicate()
 
@@ -203,4 +208,3 @@ async def Youtube_CLI(message: Message):
                 await dl_message.edit_text(
                     f"<code>{ex}</code>", parse_mode=enums.ParseMode.HTML
                 )
-                
