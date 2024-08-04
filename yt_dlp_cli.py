@@ -1,9 +1,8 @@
 import asyncio
 
+from bot.database import MongoDB
 from pyrogram import enums
 from pyrogram.types import Message
-
-from bot.database import MongoDB
 
 
 async def get_user_quality(user_id: int) -> str:
@@ -49,7 +48,8 @@ async def get_best_format(user_quality: str, format_info: list) -> str:
     return best_format
 
 
-async def get_audio_id(user_quality: str, format_info: list, video_format: str) -> str:
+async def get_audio_id(user_quality: str, format_info: list,
+                       video_format: str) -> str:
     spanish_audio_found = False
 
     for line in format_info:
@@ -93,30 +93,26 @@ async def generate_dl_command(
 
     command = ["yt-dlp", "--no-warnings", f"-f {video_format}+{audio_format}"]
 
-    if (
-        any(audio_format in line and "[es" not in line for line in format_info)
-        or audio_format == "bestaudio"
-    ):
+    if (any(audio_format in line and "[es" not in line for line in format_info)
+            or audio_format == "bestaudio"):
         command.append("--write-auto-subs")
 
-    command.extend(
-        [
-            "--sub-langs",
-            "es.*",
-            "--embed-subs",
-            "--embed-thumbnail",
-            "--embed-metadata",
-            "--parse-metadata",
-            "description:(?s)(?P<meta_comment>.+)",
-            "--convert-subs",
-            "ass",
-            "--convert-thumbnails",
-            "jpg",
-            "-o",
-            f"Root/{username}/%(title)s.%(ext)s",
-            url,
-        ]
-    )
+    command.extend([
+        "--sub-langs",
+        "es.*",
+        "--embed-subs",
+        "--embed-thumbnail",
+        "--embed-metadata",
+        "--parse-metadata",
+        "description:(?s)(?P<meta_comment>.+)",
+        "--convert-subs",
+        "ass",
+        "--convert-thumbnails",
+        "jpg",
+        "-o",
+        f"Root/{username}/%(title)s.%(ext)s",
+        url,
+    ])
 
     thumbnail_command = [
         "yt-dlp",
@@ -136,14 +132,14 @@ async def generate_dl_command(
 async def exec_command(commands: list, message, dl_message):
     for command in commands:
         proc = await asyncio.create_subprocess_exec(
-            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE)
         _, stderr = await proc.communicate()
 
         if proc.returncode != 0:
-            await dl_message.edit_text(
-                f"```{stderr.decode()}```", parse_mode=enums.ParseMode.MARKDOWN
-            )
+            await dl_message.edit_text(f"```{stderr.decode()}```",
+                                       parse_mode=enums.ParseMode.MARKDOWN)
             return
 
     await dl_message.edit_text(
@@ -158,32 +154,39 @@ async def Youtube_CLI(message: Message, msg):
     user_quality = await get_user_quality(user_id)
 
     retries = 3
-    dl_message = await msg.edit_text("🔎 <b><i>Fetching Video Details...</i></b>")
+    dl_message = await msg.edit_text("🔎 <b><i>Fetching Video Details...</i></b>"
+                                    )
 
     for attempt in range(retries + 1):
         try:
             if "playlist" in url:
-                await dl_message.edit_text("🚫 <b>Playlists Are Not Supported Yet.</b>")
+                await dl_message.edit_text(
+                    "🚫 <b>Playlists Are Not Supported Yet.</b>")
                 return
 
             format_info = await fetch_format_info(url)
 
-            if all("[info] Available formats for " not in line for line in format_info):
+            if all("[info] Available formats for " not in line
+                   for line in format_info):
                 await dl_message.edit_text("❌ <b>Invalid YouTube URL.</b>")
                 return
 
             video_format = await get_best_format(user_quality, format_info)
-            audio_format = await get_audio_id(user_quality, format_info, video_format)
+            audio_format = await get_audio_id(user_quality, format_info,
+                                              video_format)
 
-            await dl_message.edit_text(f"⬇️ <b>Downloading In {user_quality}...</b>")
+            await dl_message.edit_text(
+                f"⬇️ <b>Downloading In {user_quality}...</b>")
 
             if video_format in ["bv[vcodec^=av01]", "bv[vcodec=vp9]"]:
-                await dl_message.edit_text("⚠️ <b>Selected Quality Not Available.</b>")
+                await dl_message.edit_text(
+                    "⚠️ <b>Selected Quality Not Available.</b>")
                 await asyncio.sleep(3)
                 await dl_message.edit_text("⬇️ <b>Trying Best Available...</b>")
 
             elif video_format == "605" and user_quality != "360p":
-                await dl_message.edit_text("⚠️ <b>Selected Quality Not Available.</b>")
+                await dl_message.edit_text(
+                    "⚠️ <b>Selected Quality Not Available.</b>")
                 await asyncio.sleep(3)
                 await dl_message.edit_text("⬇️ <b>Downloading In 360p...</b>")
 
@@ -202,10 +205,8 @@ async def Youtube_CLI(message: Message, msg):
         except Exception as ex:
             if attempt < retries:
                 await dl_message.edit_text(
-                    f"🔄 <b>Retrying Download ({attempt+1}/{retries})...</b>"
-                )
+                    f"🔄 <b>Retrying Download ({attempt+1}/{retries})...</b>")
                 await asyncio.sleep(3)
             else:
-                await dl_message.edit_text(
-                    f"<code>{ex}</code>", parse_mode=enums.ParseMode.HTML
-                )
+                await dl_message.edit_text(f"<code>{ex}</code>",
+                                           parse_mode=enums.ParseMode.HTML)
